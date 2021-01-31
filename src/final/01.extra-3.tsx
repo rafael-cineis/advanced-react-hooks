@@ -4,7 +4,11 @@
 
 import * as React from 'react'
 
-const countReducer = (state, action) => ({
+type State = {count: number}
+const countReducer = (
+  state: State,
+  action: State | ((currentState: State) => State),
+) => ({
   ...state,
   ...(typeof action === 'function' ? action(state) : action),
 })

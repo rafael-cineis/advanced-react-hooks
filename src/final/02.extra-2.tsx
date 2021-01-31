@@ -10,8 +10,35 @@ import {
   PokemonInfoFallback,
   PokemonErrorBoundary,
 } from '../pokemon'
+import {PokemonData} from '../types'
 
-function asyncReducer(state, action) {
+type AsyncState<DataType> =
+  | {
+      status: 'idle' | 'pending'
+      data?: null
+      error?: null
+    }
+  | {
+      status: 'resolved'
+      data: DataType
+      error: null
+    }
+  | {
+      status: 'rejected'
+      data: null
+      error: Error
+    }
+
+type AsyncAction<DataType> =
+  | {type: 'reset'}
+  | {type: 'pending'}
+  | {type: 'resolved'; data: DataType}
+  | {type: 'rejected'; error: Error}
+
+function asyncReducer<DataType>(
+  state: AsyncState<DataType>,
+  action: AsyncAction<DataType>,
+): AsyncState<DataType> {
   switch (action.type) {
     case 'pending': {
       return {status: 'pending', data: null, error: null}
@@ -28,8 +55,10 @@ function asyncReducer(state, action) {
   }
 }
 
-function useAsync(initialState) {
-  const [state, dispatch] = React.useReducer(asyncReducer, {
+function useAsync<DataType>(initialState: AsyncState<DataType>) {
+  const [state, dispatch] = React.useReducer<
+    React.Reducer<AsyncState<DataType>, AsyncAction<DataType>>
+  >(asyncReducer, {
     status: 'idle',
     data: null,
     error: null,
@@ -38,7 +67,7 @@ function useAsync(initialState) {
 
   const {data, error, status} = state
 
-  const run = React.useCallback(promise => {
+  const run = React.useCallback((promise: Promise<DataType>) => {
     dispatch({type: 'pending'})
     promise.then(
       data => {
@@ -58,8 +87,13 @@ function useAsync(initialState) {
   }
 }
 
-function PokemonInfo({pokemonName}) {
-  const {data: pokemon, status, error, run} = useAsync({
+function PokemonInfo({pokemonName}: {pokemonName: string}) {
+  const {
+    data: pokemon,
+    status,
+    error,
+    run,
+  } = useAsync<PokemonData>({
     status: pokemonName ? 'pending' : 'idle',
   })
 
@@ -70,23 +104,24 @@ function PokemonInfo({pokemonName}) {
     run(fetchPokemon(pokemonName))
   }, [pokemonName, run])
 
-  if (status === 'idle') {
-    return 'Submit a pokemon'
-  } else if (status === 'pending') {
-    return <PokemonInfoFallback name={pokemonName} />
-  } else if (status === 'rejected') {
-    throw error
-  } else if (status === 'resolved') {
-    return <PokemonDataView pokemon={pokemon} />
+  switch (status) {
+    case 'idle':
+      return <span>Submit a pokemon</span>
+    case 'pending':
+      return <PokemonInfoFallback name={pokemonName} />
+    case 'rejected':
+      throw error
+    case 'resolved':
+      return <PokemonDataView pokemon={pokemon} />
+    default:
+      throw new Error('This should be impossible')
   }
-
-  throw new Error('This should be impossible')
 }
 
 function App() {
   const [pokemonName, setPokemonName] = React.useState('')
 
-  function handleSubmit(newPokemonName) {
+  function handleSubmit(newPokemonName: string) {
     setPokemonName(newPokemonName)
   }
 
@@ -107,22 +142,4 @@ function App() {
   )
 }
 
-function AppWithUnmountCheckbox() {
-  const [mountApp, setMountApp] = React.useState(true)
-  return (
-    <div>
-      <label>
-        <input
-          type="checkbox"
-          checked={mountApp}
-          onChange={e => setMountApp(e.target.checked)}
-        />{' '}
-        Mount Component
-      </label>
-      <hr />
-      {mountApp ? <App /> : null}
-    </div>
-  )
-}
-
-export default AppWithUnmountCheckbox
+export default App

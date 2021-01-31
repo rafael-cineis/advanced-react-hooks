@@ -11,7 +11,33 @@ import {
   PokemonErrorBoundary,
 } from '../pokemon'
 
-function asyncReducer(state, action) {
+type AsyncState<DataType> =
+  | {
+      status: 'idle' | 'pending'
+      data?: null
+      error?: null
+    }
+  | {
+      status: 'resolved'
+      data: DataType
+      error: null
+    }
+  | {
+      status: 'rejected'
+      data: null
+      error: Error
+    }
+
+type AsyncAction<DataType> =
+  | {type: 'reset'}
+  | {type: 'pending'}
+  | {type: 'resolved'; data: DataType}
+  | {type: 'rejected'; error: Error}
+
+function asyncReducer<DataType>(
+  state: AsyncState<DataType>,
+  action: AsyncAction<DataType>,
+): AsyncState<DataType> {
   switch (action.type) {
     case 'pending': {
       return {status: 'pending', data: null, error: null}
@@ -28,8 +54,13 @@ function asyncReducer(state, action) {
   }
 }
 
-function useAsync(asyncCallback, initialState) {
-  const [state, dispatch] = React.useReducer(asyncReducer, {
+function useAsync<DataType>(
+  asyncCallback: () => Promise<DataType> | null,
+  initialState: AsyncState<DataType>,
+) {
+  const [state, dispatch] = React.useReducer<
+    React.Reducer<AsyncState<DataType>, AsyncAction<DataType>>
+  >(asyncReducer, {
     status: 'idle',
     data: null,
     error: null,
@@ -53,7 +84,7 @@ function useAsync(asyncCallback, initialState) {
   return state
 }
 
-function PokemonInfo({pokemonName}) {
+function PokemonInfo({pokemonName}: {pokemonName: string}) {
   const asyncCallback = React.useCallback(() => {
     if (!pokemonName) {
       return
@@ -66,23 +97,24 @@ function PokemonInfo({pokemonName}) {
   })
   const {data: pokemon, status, error} = state
 
-  if (status === 'idle') {
-    return 'Submit a pokemon'
-  } else if (status === 'pending') {
-    return <PokemonInfoFallback name={pokemonName} />
-  } else if (status === 'rejected') {
-    throw error
-  } else if (status === 'resolved') {
-    return <PokemonDataView pokemon={pokemon} />
+  switch (status) {
+    case 'idle':
+      return <span>Submit a pokemon</span>
+    case 'pending':
+      return <PokemonInfoFallback name={pokemonName} />
+    case 'rejected':
+      throw error
+    case 'resolved':
+      return <PokemonDataView pokemon={pokemon} />
+    default:
+      throw new Error('This should be impossible')
   }
-
-  throw new Error('This should be impossible')
 }
 
 function App() {
   const [pokemonName, setPokemonName] = React.useState('')
 
-  function handleSubmit(newPokemonName) {
+  function handleSubmit(newPokemonName: string) {
     setPokemonName(newPokemonName)
   }
 
@@ -102,23 +134,4 @@ function App() {
     </div>
   )
 }
-
-function AppWithUnmountCheckbox() {
-  const [mountApp, setMountApp] = React.useState(true)
-  return (
-    <div>
-      <label>
-        <input
-          type="checkbox"
-          checked={mountApp}
-          onChange={e => setMountApp(e.target.checked)}
-        />{' '}
-        Mount Component
-      </label>
-      <hr />
-      {mountApp ? <App /> : null}
-    </div>
-  )
-}
-
-export default AppWithUnmountCheckbox
+export default App

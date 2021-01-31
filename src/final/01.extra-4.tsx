@@ -4,7 +4,9 @@
 
 import * as React from 'react'
 
-function countReducer(state, action) {
+type State = {count: number}
+type Action = {type: 'increment'; step: number}
+function countReducer(state: State, action: Action) {
   const {type, step} = action
   switch (type) {
     case 'increment': {
